@@ -1,30 +1,45 @@
-console.clear();
 // Imports
+import * as fs from "fs";
+import { html } from "parse5";
 import { load } from "cheerio";
 import puppeteer from "puppeteer";
-import { html } from "parse5";
 
 // Usando o Puppeteer para coletar o HTML gerado dinamicamente
 async function scrapePage(url) {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  await page.goto(url, { waitUntil: "networkidle2" });
-  const html = await page.content();
-  await browser.close();
-  return html;
+  try {
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "networkidle2" });
+    const html = await page.content();
+    await browser.close();
+    return html;
+  } catch (error) {
+    console.log(`An error has occurred while scraping the page!: ${error}`);
+  }
 }
 
+// Converter as strings de peço para valores em float
 function convertoCurrencyToFloat(string) {
   if (!string) return string;
   string = string.replace(",", ".");
   return Number(string.replace("R$", ""));
 }
 
+// Converter objeto para arquivo JSON
+function convertObjectToJsonFile(obj, filePath) {
+  try {
+    const jsonString = JSON.stringify(obj, null, 2);
+    fs.writeFileSync(filePath, jsonString);
+    console.log(`Object successfully written to ${filePath}`);
+  } catch (error) {
+    console.error("An error occurred:", error);
+  }
+}
+
 // Coletar os resultados de pesquisa
 async function getSearchResults(query) {
   // Coletar e parsear o HTML
   const HTML = await scrapePage(`https://lista.mercadolivre.com.br/${query}`);
-  console.log(HTML);
   const $ = load(HTML);
 
   // Selecionando os resultados e criando a array de resultadis.
@@ -50,9 +65,15 @@ async function getSearchResults(query) {
     resultObj.discount = discount !== "" ? discount : null;
 
     // Compra internacional?
-    const internationalPurchase = result.find('span:contains("COMPRA INTERNACIONAL")').text();
+    const internationalPurchase = result.find('span:contains("COMPRA INTERNACIONAL")').text().trim();
+    resultObj.internationalPurchase = internationalPurchase === "COMPRA INTERNACIONAL" ? true : false;
+
+    // Adicionar resultado a array de resultados
     results.push(resultObj);
   });
+
+  // Cria um JSON com os resultados
+  convertObjectToJsonFile(results, `./results/${query}.json`);
 }
 
 // getSearchResults("pesquisa vai aqui :)");
